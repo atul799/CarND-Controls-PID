@@ -108,7 +108,8 @@ There is a hint in the project code to try PID for throttle control as well.In t
 The source code of this project is available at [github]( https://github.com/atul799/CarND-Controls-PID/src)
 To compile and run the PID code (non-twiddle mode), following steps are required:
 
-1. cd build
+1. mkdir build
+2. cd build
 2. cmake ..
 3. make
 4. ./pid
