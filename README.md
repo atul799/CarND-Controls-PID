@@ -99,7 +99,7 @@ Following image is the result of running simulator with the project submission  
 ![picture alt](./outputs/PID.gif) 
 
 There is a hint in the project code to try PID for throttle control as well.In this implementation throttle is set at 0.3, this can be an improvement in future.
-*Feel free to play around with the throttle and speed. Maybe use another PID controller to control the speed!*
+*"Feel free to play around with the throttle and speed. Maybe use another PID controller to control the speed!"*
 
 
 # Source Code Files
