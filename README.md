@@ -116,10 +116,8 @@ To compile and run the PID code (non-twiddle mode), following steps are required
 5. open unity Simulator, choose data and run
 
 For twiddle tuning of parameters, the run command shall be:
-1. with p vector initialized as 0
-./pid 1 
-2. provide initial guess for p vector
-./pid 1 <init_kp_guess> <init_ki_guess> <init_kd_guess>
+1. with p vector initialized as 0: ./pid 1 
+2. provide initial guess for p vector: ./pid 1 <init_kp_guess> <init_ki_guess> <init_kd_guess>
  
 
 
