@@ -31,7 +31,7 @@ public:
     // nr of steps to settle
     int nb_settle;
     double total_error, avg_error,best_error;
-    int distance_travelled,best_distance;
+    int distance_travelled,best_distance,best_distance_berror;
     int twiddle_loop_count;
 
     int twiddle;
@@ -42,6 +42,16 @@ public:
 
     double max_cte;
     int best_error_loop;
+
+    //check if angles are changing quite rapidly over 25 steps
+    //P is too high reset
+    std::vector<double> angle_vector;
+
+    //capture step when brake applied (throttle=-1)
+    int brake_step;
+    //flag to capture if brake_applied
+    bool brake_applied;
+    int sim_step; //
 
 
 

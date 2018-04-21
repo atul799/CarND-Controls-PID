@@ -3,6 +3,7 @@
 
 #include <vector>
 #include <numeric>
+#include <limits>
 
 using namespace std;
 
@@ -44,16 +45,22 @@ void PID::Init(double Kp, double Ki, double Kd,bool twiddle,int nb_params) {
 	twiddle_loop_count=0;
 	total_error=0.0;
 	avg_error=0.0;
-	best_error=1000;
+	//best_error=1000;
+	best_error=std::numeric_limits<long int>::max();
 
-	//nb_settle=200;
-	nb_settle=100;
+	nb_settle=200;
+	//nb_settle=100;
 	//nb_settle=50;
 	//nb_settle=400;
 	//nb_settle=1200;
 
 	distance_travelled=0;
-	best_distance=step;
+	best_distance=nb_settle;
+	best_distance_berror=step;
+
+
+	brake_step=0;
+	brake_applied=false;
 
 	max_cte=0.0;
 	best_error_loop=0;
@@ -63,6 +70,13 @@ void PID::Init(double Kp, double Ki, double Kd,bool twiddle,int nb_params) {
 	//if(this->twiddle) {
 	//	this->Kp=p[0];
 	//}
+
+	for(int i=0;i<2*nb_settle;i++){
+		angle_vector.push_back(0.0);
+	}
+
+	cout<<"avg angle size is:"<<angle_vector.size()<<endl;
+
 	cout <<"PID Init Done!"<<endl;
 	cout <<"Kp_Init: "<<this->Kp<<" Ki_Init: "<<this->Ki<<" Kd_Init: "<<this->Kd<<endl;
 }
@@ -95,8 +109,8 @@ double PID::TwSumDp() {
 
 void PID::TwBestError(){
 	best_error = avg_error;
-	if(step > best_distance) {
-		best_distance = step;
+	if(step > best_distance_berror) {
+		best_distance_berror = step;
 	}
 	dp[param_index] *= 1.1;
 	//dp[param_index] *= 1.2;

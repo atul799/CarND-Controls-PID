@@ -48,6 +48,7 @@ int main(int argc, char *argv[])
 	  cerr << "Cannot open output file: " << out_file_name << endl;
 	  exit(EXIT_FAILURE);
   }
+  out_file <<"Twiddle,"<<"Step,"<<"Kp,"<<"Ki,"<<"Kd,"<<"angle,"<<"cte,"<<"d_error,"<<"i_error,"<<endl;
   ////////////////////
 
   //Grab pid values from command line, sequence is Kp,Ki,Kd
@@ -84,13 +85,30 @@ int main(int argc, char *argv[])
 	  //final PID gains
 	  pid.Init(0.134587, 0.0, 3.05298,false,3);
 
+	  //with angle control--> speed upto 90 mph, last corner lane breach,slight manual tuning needed
+	  //Twiddle stopped: 0 After: 77 Twiddle Loops
+	  //Sum of Dp: 0.875532
+	  //p[0]: 0.101712 p[1]: 0 p[2]: 4.12385
+	  //dp[0]: 0.310672 dp[1]: 0.254187 dp[2]: 0.310672
+
+	  //with angle control--> speed upto 77 mph, last corner lane breach, manual tuning needed
+	  //Twiddle stopped: 0 After: 48 Twiddle Loops
+	  //Sum of Dp: 1.88071
+	  //p[0]: 0.351956 p[1]: 0 p[2]: 9.87855
+	  //dp[0]: 0.707348 dp[1]: 0.38742 dp[2]: 0.785942
+
+
+
+
+
+	  ////////////////////////////////////////////
 	  //test with P only for report
 	  //pid.Init(0.134587, 0.0, 0.0,false,3);
 	  //test with PI only for report
 	  //pid.Init(0.134587, 0.01, 0.0,false,3);
-
+	  /////////////////////////////////////
 	  //pid.Init(0.109, 0.0, 1,false,3);
-	  //pid.Init(0.654432, 0.0, 14.8397,false,3);
+	  //pid.Init(0.654432, 0.0, 14.8397,false,3); //doesn't work if throttle is max'd
 
 	  //values of p/dp found in twiddle loops ate different times (simulator is random!!)
 	  //Twiddle stopped: 0,  Sum of Dp: 2.511
@@ -132,7 +150,7 @@ int main(int argc, char *argv[])
           double cte = std::stod(j[1]["cte"].get<std::string>());
           double speed = std::stod(j[1]["speed"].get<std::string>());
           double angle = std::stod(j[1]["steering_angle"].get<std::string>());
-          double steer_value;
+          double steer_value,throttle_value;
           /*
           *  Calcuate steering value here, remember the steering value is
           * [-1, 1].
@@ -143,10 +161,12 @@ int main(int argc, char *argv[])
           ////////////////////////////////////////////////////////////////////////
           //push the cte into output file
           //out_file << cte <<endl;
+          out_file <<pid.twiddle <<","<<pid.step<<","<<pid.Kp<<","<<pid.Ki<<","<<pid.Kd<<","<<angle<<","<<cte<<","<<pid.d_error<<","<<pid.i_error<<","<<endl;
+
 
           //dbg keep track of max cte when simulator didn't reset for whole track (5000 steps)
           //abs means cte can have been +/-
-          if((pid.step> 1500 && fabs(cte) > pid.max_cte) || !pid.twiddle ) {
+          if((pid.step>  pid.best_distance && fabs(cte) > pid.max_cte) || !pid.twiddle ) {
         	  pid.max_cte=fabs(cte);
         	  //cout << "In Twiddle iteration: "<<pid.twiddle_loop_count<<" Max cte is :"<<pid.max_cte<<endl;
           }
@@ -184,8 +204,9 @@ int main(int argc, char *argv[])
 
           if (pid.twiddle==1) {
 
+        	  double avg_angle=0.0;
         	  //push the cte into output file
-        	  out_file << pid.step<<","<<cte <<endl;
+        	  //out_file << pid.step<<","<<cte <<endl;
         	  pid.step++;
         	  pid.distance_travelled=pid.step;
 
@@ -193,15 +214,25 @@ int main(int argc, char *argv[])
         	  if (pid.step > 5) {
         		  pid.total_error += cte*cte;
         		  pid.avg_error=pid.total_error/(pid.step-5);
+        		  pid.angle_vector[(pid.step-6)%(2*pid.nb_settle)]=fabs(angle);
+        		  avg_angle=accumulate(pid.angle_vector.begin(),pid.angle_vector.end(),0.0)/(2*pid.nb_settle);
         	  }
+
+        	  //out_file << pid.step<<","<<pid.Kp<<","<<pid.Ki<<","<<pid.Kd<<","<<angle<<","<<cte<<","<<pid.d_error<<","<<pid.i_error<<","<<endl;
         	  //if (pid.step > pid.nb_settle/2) {
         		//  //then start aggregating error
         		//  pid.total_error += cte*cte;
         	  //}
         	  //if stabilization steps done and cte and speed outof target
         	  //if (pid.step > pid.nb_settle && (fabs(cte) > 3.0 || speed < 1.0)) {
-        	  if (pid.step > pid.nb_settle && (fabs(cte) > 3.0 || speed < 1.0)) {
-        		  out_file << "Step: "<<pid.step<< " Reset" <<endl;
+        	  //if (pid.step > pid.nb_settle && (fabs(cte) > 3.0 || speed < 1.0)) {
+        	  //if (pid.step > pid.nb_settle && (fabs(cte) > 4.0 || speed < 1.0 || fabs(avg_angle) > 15.0 )) {
+        	  //if ((pid.step > pid.best_distance || fabs(avg_angle) > 20.0) && (fabs(cte) > 4.0 || speed < 1.0 )) {
+        	  if ((pid.step > pid.nb_settle || fabs(avg_angle) > 20.0) && (fabs(cte) > 4.0 || speed < 1.0 )) {
+        		  out_file << " Reset," <<endl;
+        		  cout <<"Avg Angle: "<<avg_angle<<" Size: "<<pid.angle_vector.size()<< endl;
+
+
         		  //calculate avg_error
         		  //pid.avg_error=pid.total_error/(pid.step-pid.nb_settle/2);
         		  //pid.avg_error=pid.total_error/pid.step;
@@ -259,7 +290,7 @@ int main(int argc, char *argv[])
 
         		  //check if last avg_error < best_error was greater than 50
         		  //then shake Kd --> p[2] +=1.0;
-        		  if ((pid.twiddle_loop_count-pid.best_error_loop) > 20) {
+        		  if ((pid.twiddle_loop_count-pid.best_error_loop) > 30) {
         			  //increase Kd to 2*Kp if existing Kd is < 2*Kp
         			  double n_kd=pid.p[0]*5.0; //a bit too drastic?? damping factor increased
 					  if (n_kd > pid.p[2]) {
@@ -273,6 +304,9 @@ int main(int argc, char *argv[])
 
         		  // update Kp,Ki,Kd before going into reset
         		  pid.TwUpdateGains();
+
+
+        		  //remove all the history (step/i_error/total_error/avg_error/angle_vector)
         		  pid.d_error=0;
         		  pid.i_error=0;
 
@@ -280,6 +314,9 @@ int main(int argc, char *argv[])
         		  pid.step=0;
         		  pid.total_error=0.0;
         		  pid.avg_error=0.0;
+        		  for(int i=0;i<pid.nb_settle/2;i++){
+        		  		pid.angle_vector[i]=0.0;
+        		  	}
         		  cout<<"Resetting sim with cte: "<<cte<<" Speed: "<<speed<<" Best dist:"<<pid.best_distance<<endl;
         		  cout<<"Sumdp: "<<pid.TwSumDp()<<" twiddle loops sofar: "<<pid.twiddle_loop_count<<endl;
         		  cout<<"avg_err < best_err was last found in twiddle loop: "<<pid.best_error_loop<<" i.e. " << pid.twiddle_loop_count-pid.best_error_loop << " twiddle loop ago!"<<endl;
@@ -289,7 +326,9 @@ int main(int argc, char *argv[])
 
         		  //if (pid.step > pid.nb_settle && (fabs(cte) > 4.0 || speed < 1.0))
         	  }
-
+        	  if (pid.step>pid.best_distance){
+        		  pid.best_distance=pid.step;
+        	  }
         	  //if (pid.twiddle==1)
 
           }
@@ -298,11 +337,71 @@ int main(int argc, char *argv[])
 
           pid.UpdateError(cte);
           steer_value = pid.TotalError();
-          double throttle_value = 0.3;
+
+          //static throttle value
+          //double throttle_value = 0.3;
+
+          //borrowed idea
+          //if the cte is high, and most likely moving in a curve instead of moving straight based on the steering angle,
+          //and the speed is too high, we should decelerate aggressively,
+		  //so as to be conservative and not hit the curve; but in all other cases we should accelerate
+		  //to the maximum allowed value. The parameters here are also tuned manually.
+          //max speed in sim is 100 mph, on staright vehicle reached 89 mph
+          //double throttle_value = 1.0;
+          ////if (fabs(cte) > 0.6 && fabs(angle) > 7.5 && speed > 50.0) {
+          //if (fabs(cte) > 0.6 && fabs(angle) > 6.5 && speed > 50.0) {
+          //  throttle_value = -1.0; // curve
+          //}
+
+          //reduce speed drastically but increase gradually when break applied
+          //full throttle until break applied
+          if (!pid.brake_applied) {
+        	  //&& pid.step > pid.brake_step+20.0 ) {
+        	  throttle_value = 1.0;
+
+          } else {
+        	  pid.brake_step++;
+        	  if (pid.brake_step <=10 ) {
+        		  throttle_value= -1;
+        		  cout<<"Throttle Reset: "<<throttle_value<<" Step: "<<pid.brake_step<<endl;
+        	  }
+        	  if (pid.brake_step> 10 && pid.brake_step < 50) {
+        		  throttle_value += 2.0/48.0;
+        		  if(throttle_value>1.0) {
+        			  throttle_value=1.0;
+        		  }
+        		  cout<<"Throttle increased: "<<throttle_value<<" Step: "<<pid.brake_step <<endl;
+        	  }
+        	  if (pid.brake_step >= 50 ) {
+        		  //cout<<"Full Throttle again: "<<throttle_value<<endl;
+        		  pid.brake_applied=false;
+        		  //pid.brake_step=0;
+        		  cout<<"Full Throttle again:"<<throttle_value<<" Brake status: "<<pid.brake_applied<<" Step:"<<pid.brake_step<< endl;
+        	  }
+          }
+
+
+          //gradually increase throttle
+
+
+          if (fabs(cte) > 0.6 && fabs(angle) > 6.5 && speed > 50.0) {
+            throttle_value = -1.0; // curve
+            pid.brake_applied=true;
+            pid.brake_step=0;
+            cout<<"Brake Applied at Step: "<<pid.brake_step<<endl;
+          }
+
+
+
+
+
 
           if (steer_value > 1.0) {
         	  steer_value = 1.0;
           } else if (steer_value < -1.0) steer_value = -1.0;
+
+
+
 
           // DEBUG
           if(!pid.twiddle) std::cout << "CTE: " << cte << " Steering Value: " << steer_value << std::endl;
