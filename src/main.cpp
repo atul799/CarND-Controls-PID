@@ -83,7 +83,14 @@ int main(int argc, char *argv[])
 	  cout <<"PID init with twiddle disabled"<<endl;
 
 	  //final PID gains
-	  pid.Init(0.134587, 0.0, 3.05298,false,3);
+	  //pid.Init(0.134587, 0.0, 3.05298,false,3);
+
+	  pid.Init(0.140427, 0.0, 2.8306,false,3);
+
+	  //Twiddle stopped: 0 After: 75 Twiddle Loops --> very slight overstepp on unmarked turned,89 mph topspeed
+	  //Sum of Dp: 1.2855
+	  //p[0]: 0.140427 p[1]: 0 p[2]: 2.8306
+	  //dp[0]: 0.567222 dp[1]: 0.254187 dp[2]: 0.464091
 
 	  //with angle control--> speed upto 90 mph, last corner lane breach,slight manual tuning needed
 	  //Twiddle stopped: 0 After: 77 Twiddle Loops
@@ -211,12 +218,18 @@ int main(int argc, char *argv[])
         	  pid.distance_travelled=pid.step;
 
         	  //first few steps after reset ctee doesn't reset
+        	  /*
         	  if (pid.step > 5) {
         		  pid.total_error += cte*cte;
         		  pid.avg_error=pid.total_error/(pid.step-5);
         		  pid.angle_vector[(pid.step-6)%(2*pid.nb_settle)]=fabs(angle);
         		  avg_angle=accumulate(pid.angle_vector.begin(),pid.angle_vector.end(),0.0)/(2*pid.nb_settle);
-        	  }
+        	  } */
+
+        	  pid.total_error += cte*cte;
+        	  pid.avg_error=pid.total_error/(pid.step);
+        	  pid.angle_vector[(pid.step-1)%(2*pid.nb_settle)]=fabs(angle);
+        	  avg_angle=accumulate(pid.angle_vector.begin(),pid.angle_vector.end(),0.0)/(2*pid.nb_settle);
 
         	  //out_file << pid.step<<","<<pid.Kp<<","<<pid.Ki<<","<<pid.Kd<<","<<angle<<","<<cte<<","<<pid.d_error<<","<<pid.i_error<<","<<endl;
         	  //if (pid.step > pid.nb_settle/2) {
@@ -290,14 +303,17 @@ int main(int argc, char *argv[])
 
         		  //check if last avg_error < best_error was greater than 50
         		  //then shake Kd --> p[2] +=1.0;
-        		  if ((pid.twiddle_loop_count-pid.best_error_loop) > 30) {
+
+        		  if ((pid.twiddle_loop_count-pid.best_error_loop) > 20) {
         			  //increase Kd to 2*Kp if existing Kd is < 2*Kp
-        			  double n_kd=pid.p[0]*5.0; //a bit too drastic?? damping factor increased
-					  if (n_kd > pid.p[2]) {
+        			  //double n_kd=pid.p[0]*5.0; //a bit too drastic?? damping factor increased
+        			  double n_kd=pid.p[0]*2.0;
+        			  if (n_kd > pid.p[2]) {
 						  pid.p[2]= n_kd;
 					  }
         			  //reduce Kp by 2
-        			  pid.p[0] /=2.0; //ratio of Kd/Kp is now 10, vehicle is very sensitive to Kp gain
+        			  //pid.p[0] /=2.0; //ratio of Kd/Kp is now 10, vehicle is very sensitive to Kp gain
+        			  pid.p[0] /=2.0; //ratio of Kd/Kp is now 4, vehicle is very sensitive to Kp gain
         			  pid.best_error_loop=pid.twiddle_loop_count;
         			  cout<<"Twiddle loop shaken at step: "<<pid.twiddle_loop_count<<endl;
         		  }
@@ -341,12 +357,13 @@ int main(int argc, char *argv[])
           //static throttle value
           //double throttle_value = 0.3;
 
-          //borrowed idea
-          //if the cte is high, and most likely moving in a curve instead of moving straight based on the steering angle,
-          //and the speed is too high, we should decelerate aggressively,
-		  //so as to be conservative and not hit the curve; but in all other cases we should accelerate
-		  //to the maximum allowed value. The parameters here are also tuned manually.
-          //max speed in sim is 100 mph, on staright vehicle reached 89 mph
+
+          //A simpler idea is used instead of implementing a controller for throttle/speed.
+          //If the cte is high, and vehicle is going around a curve(steering angle indicates this),
+          //if speed is  high in this condition, decelerate vehicle, In all other situation
+          //let vehicles go at max throttle. The parameters here are also tuned manually.
+          //max speed of simulator is 100 mph, achieved 89 mph
+
           //double throttle_value = 1.0;
           ////if (fabs(cte) > 0.6 && fabs(angle) > 7.5 && speed > 50.0) {
           //if (fabs(cte) > 0.6 && fabs(angle) > 6.5 && speed > 50.0) {
@@ -355,28 +372,31 @@ int main(int argc, char *argv[])
 
           //reduce speed drastically but increase gradually when break applied
           //full throttle until break applied
+          //after applying break, gradually increase speed
+
           if (!pid.brake_applied) {
         	  //&& pid.step > pid.brake_step+20.0 ) {
         	  throttle_value = 1.0;
 
           } else {
         	  pid.brake_step++;
-        	  if (pid.brake_step <=10 ) {
-        		  throttle_value= -1;
-        		  cout<<"Throttle Reset: "<<throttle_value<<" Step: "<<pid.brake_step<<endl;
-        	  }
-        	  if (pid.brake_step> 10 && pid.brake_step < 50) {
-        		  throttle_value += 2.0/48.0;
+        	  //if (pid.brake_step <=10 ) {
+        	  //  throttle_value += .01;
+        	 //	  cout<<"Throttle Reset: "<<throttle_value<<" Step: "<<pid.brake_step<<endl;
+        	  //}
+        	  //if (pid.brake_step> 10 && pid.brake_step < 50) {
+        	  if (pid.brake_step <= 25) {
+        		  throttle_value += 2.0/25.0;
         		  if(throttle_value>1.0) {
         			  throttle_value=1.0;
         		  }
-        		  cout<<"Throttle increased: "<<throttle_value<<" Step: "<<pid.brake_step <<endl;
+        		  //cout<<"Throttle increased: "<<throttle_value<<" Step: "<<pid.brake_step <<endl;
         	  }
-        	  if (pid.brake_step >= 50 ) {
+        	  if (pid.brake_step >= 25 ) {
         		  //cout<<"Full Throttle again: "<<throttle_value<<endl;
         		  pid.brake_applied=false;
         		  //pid.brake_step=0;
-        		  cout<<"Full Throttle again:"<<throttle_value<<" Brake status: "<<pid.brake_applied<<" Step:"<<pid.brake_step<< endl;
+        		  //cout<<"Full Throttle again:"<<throttle_value<<" Brake status: "<<pid.brake_applied<<" Step:"<<pid.brake_step<< endl;
         	  }
           }
 
@@ -384,11 +404,12 @@ int main(int argc, char *argv[])
           //gradually increase throttle
 
 
-          if (fabs(cte) > 0.6 && fabs(angle) > 6.5 && speed > 50.0) {
+          //if (fabs(cte) > 0.6 && fabs(angle) > 6.5 && speed > 50.0) {
+          if (fabs(cte) > 0.6 && fabs(angle) > 6.5 && speed > 45.0) {
             throttle_value = -1.0; // curve
             pid.brake_applied=true;
             pid.brake_step=0;
-            cout<<"Brake Applied at Step: "<<pid.brake_step<<endl;
+            //cout<<"Brake Applied at Step: "<<pid.brake_step<<endl;
           }
 
 

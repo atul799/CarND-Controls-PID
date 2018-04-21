@@ -47,11 +47,11 @@ public:
     //P is too high reset
     std::vector<double> angle_vector;
 
-    //capture step when brake applied (throttle=-1)
+    //counter for gradual increase of throttle
     int brake_step;
     //flag to capture if brake_applied
     bool brake_applied;
-    int sim_step; //
+
 
 
 

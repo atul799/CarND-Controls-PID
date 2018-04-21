@@ -2,6 +2,9 @@
 [![Udacity - Self-Driving Car NanoDegree](https://s3.amazonaws.com/udacity-sdc/github/shield-carnd.svg)](http://www.udacity.com/drive)
 
 
+### Update After submission
+* Dynamic Throttle control added
+
 # Project Goals
 ---
 The goal of this project are the following:
@@ -98,8 +101,15 @@ Following image is the result of running simulator with the project submission  
 
 ![picture alt](./outputs/PID.gif) 
 
-There is a hint in the project code to try PID for throttle control as well.In this implementation throttle is set at 0.3, this can be an improvement in future.
+There is a hint in the project code to try PID for throttle control as well.
 *"Feel free to play around with the throttle and speed. Maybe use another PID controller to control the speed!"*
+
+Update:
+A simpler idea is used instead of implementing a controller for throttle/speed.
+If the cte is high, and vehicle is going around a curve(steering angle indicates this),if speed is  high in this condition, decelerate vehicle, In all other situation let vehicles go at max throttle. The parameters here are also tuned manually.Max speed of vehicle in simulator is 100 mph, achieved 89 mph. Twiddle gave a good gain parameter set, there was a slight crossover in the unmarked part of the lane, that was fixed by reducing speed at which break is applied.
+Here is the result:
+![picture alt](./outputs/PID_Throttle_control.gif) 
+
 
 
 # Source Code, Compilation and Run
